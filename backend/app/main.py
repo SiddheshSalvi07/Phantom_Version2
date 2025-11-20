@@ -1,10 +1,11 @@
-"""Backend FastAPI app and API endpoints for PHANTOM MVP."""
-from fastapi import FastAPI, HTTPException
+"""Backend FastAPI app and API endpoints for PHANTOM MVP with auth + persistence."""
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from uuid import uuid4
-from . import schemas, worker_client
-from . import crud
+from sqlalchemy.orm import Session
+from . import schemas, worker_client, crud, auth
+import os
 
 app = FastAPI(title="PHANTOM Backend")
 
@@ -16,73 +17,85 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory task store for MVP. TODO: persist in Postgres and add ownership.
-TASK_STORE = {}
+crud.ensure_db()
 
+
+class RegisterPayload(BaseModel):
+    email: str
+    password: str
+
+class LoginPayload(BaseModel):
+    email: str
+    password: str
+
+@app.post("/api/auth/register")
+def register(payload: RegisterPayload, db: Session = Depends(crud.get_db)):
+    if crud.get_user_by_email(db, payload.email):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    user = crud.create_user(db, payload.email, payload.password)
+    token = auth.create_access_token(user.id, user.email)
+    return {"access_token": token, "token_type": "bearer"}
+
+@app.post("/api/auth/login")
+def login(payload: LoginPayload, db: Session = Depends(crud.get_db)):
+    user = crud.authenticate(db, payload.email, payload.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    token = auth.create_access_token(user.id, user.email)
+    return {"access_token": token, "token_type": "bearer"}
 
 @app.post("/api/goal")
-def create_goal(payload: schemas.GoalCreate):
-    """Create a new goal/task and return initial mocked plan."""
-    task_id = str(uuid4())
-    # Mocked plan - placeholder for planner integration
+def create_goal(payload: schemas.GoalCreate, current_user=Depends(auth.get_current_user), db: Session = Depends(crud.get_db)):
     plan = [
         {"step": 1, "title": "Clarify goal", "notes": "Ask for clarification if needed."},
         {"step": 2, "title": "Draft plan", "notes": "Create a multi-step plan."},
         {"step": 3, "title": "Execute", "notes": "Run tasks via workers."},
     ]
-    TASK_STORE[task_id] = {
-        "user_id": payload.user_id,
-        "title": payload.title,
-        "description": payload.description,
-        "status": "created",
-        "plan": plan,
-        "approved": False,
-    }
-    return {"task_id": task_id, "plan": plan}
+    task = crud.create_task(db, current_user.id, payload.title, payload.description, plan)
+    return {"task_uuid": task.task_uuid, "plan": plan}
 
 
-@app.get("/api/status/{task_id}")
-def get_status(task_id: str):
-    if task_id not in TASK_STORE:
+@app.get("/api/status/{task_uuid}")
+def get_status(task_uuid: str, current_user=Depends(auth.get_current_user), db: Session = Depends(crud.get_db)):
+    task = crud.get_task_by_uuid(db, task_uuid)
+    if not task or task.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="task not found")
-    data = TASK_STORE[task_id]
-    return {"task_id": task_id, "status": data.get("status"), "approved": data.get("approved")}
+    return {"task_uuid": task_uuid, "status": task.status, "approved": bool(task.approved)}
 
 
-@app.post("/api/approve/{task_id}")
-def approve_task(task_id: str):
-    if task_id not in TASK_STORE:
+@app.post("/api/approve/{task_uuid}")
+def approve_task(task_uuid: str, current_user=Depends(auth.get_current_user), db: Session = Depends(crud.get_db)):
+    task = crud.get_task_by_uuid(db, task_uuid)
+    if not task or task.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="task not found")
-    TASK_STORE[task_id]["approved"] = True
-    TASK_STORE[task_id]["status"] = "approved"
-    return {"task_id": task_id, "approved": True}
+    task = crud.approve_task(db, task)
+    return {"task_uuid": task.task_uuid, "approved": True}
 
 
-@app.post("/api/execute/{task_id}")
-def execute_task(task_id: str):
-    if task_id not in TASK_STORE:
+@app.post("/api/execute/{task_uuid}")
+def execute_task(task_uuid: str, current_user=Depends(auth.get_current_user), db: Session = Depends(crud.get_db)):
+    task = crud.get_task_by_uuid(db, task_uuid)
+    if not task or task.owner_id != current_user.id:
         raise HTTPException(status_code=404, detail="task not found")
-    task = TASK_STORE[task_id]
-    if not task.get("approved"):
+    if not bool(task.approved):
         raise HTTPException(status_code=400, detail="task not approved")
-    # Enqueue the task for workers
-    worker_client.enqueue_task({"task_id": task_id, "task": task})
-    TASK_STORE[task_id]["status"] = "queued"
-    return {"task_id": task_id, "status": "queued"}
+    worker_client.enqueue_task({"task_uuid": task_uuid, "task": {"title": task.title}})
+    crud.queue_task(db, task)
+    return {"task_uuid": task_uuid, "status": "queued"}
 
 
 class WorkerLog(BaseModel):
-    task_id: str
+    task_uuid: str
     status: str
     payload: dict
 
-
 @app.post("/api/worker/log")
-def worker_log(entry: WorkerLog):
-    """Endpoint for workers to submit execution logs. Persisted if DB is configured.
-
-    TODO: secure this endpoint and add auth between workers and backend.
-    """
-    # Best-effort persistence
-    created = crud.create_task_log(entry.task_id, entry.status, entry.payload)
+def worker_log(entry: WorkerLog, x_worker_token: str = Header(None), db: Session = Depends(crud.get_db)):
+    expected = os.getenv("WORKER_TOKEN", "devworkertoken")
+    if x_worker_token != expected:
+        raise HTTPException(status_code=401, detail="Invalid worker token")
+    task = crud.get_task_by_uuid(db, entry.task_uuid)
+    if not task:
+        raise HTTPException(status_code=404, detail="task not found")
+    created = crud.create_task_log(db, task, entry.status, entry.payload)
     return {"ok": True, "db_written": created is not None}

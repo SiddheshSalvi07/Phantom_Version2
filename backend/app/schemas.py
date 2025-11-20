@@ -1,9 +1,11 @@
-"""Pydantic schemas for backend API requests and responses."""
+"""Pydantic schemas for backend API requests and responses.
+
+Updated: user_id removed (derived from auth token).
+"""
 from pydantic import BaseModel
 from typing import Optional
 
 
 class GoalCreate(BaseModel):
-    user_id: str
     title: str
     description: Optional[str] = None
