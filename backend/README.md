@@ -21,6 +21,21 @@ Environment:
 - `JWT_SECRET` / `JWT_ALG` — JWT token signing configuration
 - `WORKER_TOKEN` — shared secret for worker log ingestion
 
+Migrations (Alembic):
+
+```powershell
+python -m venv .venv; .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+alembic upgrade head
+```
+
+Smoke test:
+
+```powershell
+cd ..\scripts
+./smoke.ps1 -BaseUrl http://localhost:8000
+```
+
 API docs: http://localhost:8000/docs
 
 Auth usage example:
