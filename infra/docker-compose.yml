@@ -25,6 +25,10 @@ services:
     container_name: phantom_backend
     env_file:
       - ./.env
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_ALG=${JWT_ALG}
+      - WORKER_TOKEN=${WORKER_TOKEN}
     depends_on:
       - redis
       - db

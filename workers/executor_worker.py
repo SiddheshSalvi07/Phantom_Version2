@@ -7,9 +7,11 @@ import os
 import time
 import json
 import requests
+import os
 
 REDIS_URL = os.getenv("REDIS_URL")
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+WORKER_TOKEN = os.getenv("WORKER_TOKEN", "devworkertoken")
 
 def run_loop():
     if REDIS_URL:
@@ -38,9 +40,11 @@ def process_task(task):
     print(f"Processing task {task_id}")
     # TODO: implement model routing, step executor, and external integrations.
     time.sleep(1)
-    log = {"task_id": task_id, "status": "done", "payload": {"note": "simulated run"}}
+    # Adjust for updated API expecting task_uuid and worker token header
+    worker_token = os.getenv("WORKER_TOKEN", "devworkertoken")
+    log = {"task_uuid": task_id, "status": "done", "payload": {"note": "simulated run"}}
     try:
-        r = requests.post(f"{BACKEND_URL}/api/worker/log", json=log, timeout=5)
+        r = requests.post(f"{BACKEND_URL}/api/worker/log", json=log, headers={"X-Worker-Token": worker_token}, timeout=5)
         print("Posted log to backend:", r.status_code, r.text)
     except Exception as e:
         print("Failed to post log to backend:", e)
