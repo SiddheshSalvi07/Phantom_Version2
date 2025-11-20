@@ -1,7 +1,7 @@
 # Smoke test script for PHANTOM backend
 param(
-  [string]$BaseUrl = "http://localhost:8000",
-  [string]$WorkerToken = "devworkertoken"
+    [string]$BaseUrl = "http://localhost:8000",
+    [string]$WorkerToken = "devworkertoken"
 )
 
 Write-Host "Running smoke test against $BaseUrl"
@@ -30,7 +30,7 @@ $queued = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/execute/$tid" -Heade
 Write-Host "Execute after approve:" $queued.status
 
 $logBody = @{ task_uuid = $tid; status = "done"; payload = @{ note = "smoke" } } | ConvertTo-Json
-$logResp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/worker/log" -ContentType "application/json" -Headers @{"X-Worker-Token"=$WorkerToken} -Body $logBody
+$logResp = Invoke-RestMethod -Method Post -Uri "$BaseUrl/api/worker/log" -ContentType "application/json" -Headers @{"X-Worker-Token" = $WorkerToken } -Body $logBody
 Write-Host "Worker log ok:" $logResp.ok
 
 Write-Host "Smoke test completed." -ForegroundColor Green

@@ -47,5 +47,19 @@ services:
     depends_on:
       - backend
 
+  worker:
+    build:
+      context: ../workers
+    container_name: phantom_worker
+    env_file:
+      - ./.env
+    environment:
+      - BACKEND_URL=${BACKEND_URL}
+      - REDIS_URL=${REDIS_URL}
+      - WORKER_TOKEN=${WORKER_TOKEN}
+    depends_on:
+      - backend
+      - redis
+
 volumes:
   db_data:

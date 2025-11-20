@@ -1,5 +1,6 @@
 // GoalForm component: collects a goal and posts to backend API
 import { useState } from 'react'
+import VoiceButton from './VoiceButton'
 
 export default function GoalForm({ onResult }) {
   const [title, setTitle] = useState('')
@@ -36,6 +37,7 @@ export default function GoalForm({ onResult }) {
       </div>
       <div className="flex items-center space-x-2">
         <button aria-label="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded">{loading ? 'Submitting...' : 'Submit'}</button>
+        <VoiceButton onClick={() => alert('Voice input stub')} />
         <button type="button" className="px-3 py-2 border rounded">Cancel</button>
         <div className="ml-auto"><a href="/workflow" className="text-sm underline">Open Workflow</a></div>
       </div>

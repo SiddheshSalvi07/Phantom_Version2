@@ -69,6 +69,7 @@ pwsh scripts/smoke.ps1 -BaseUrl http://localhost:8000
 ```
 
 Notes:
+
 - Recommended Python: 3.11 for backend local dev/tests.
 - Backend API docs: http://localhost:8000/docs
 
