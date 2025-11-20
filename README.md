@@ -25,7 +25,9 @@ Quick start (dev):
 2. Start with Docker Compose (build images):
 
 ```powershell
-docker-compose -f infra/docker-compose.yml up --build
+cd infra
+Copy-Item .env.example .env
+docker compose up -d --build
 ```
 
 3. Backend API: http://localhost:8000/docs
@@ -50,6 +52,25 @@ Run worker (dev):
 ```powershell
 cd workers; pip install -r requirements.txt; $env:REDIS_URL="redis://localhost:6379/0"; $env:BACKEND_URL="http://localhost:8000"; python executor_worker.py
 ```
+
+Migrations (Alembic):
+
+```powershell
+cd backend
+python -m venv .venv; .\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+alembic upgrade head
+```
+
+Smoke test (PowerShell):
+
+```powershell
+pwsh scripts/smoke.ps1 -BaseUrl http://localhost:8000
+```
+
+Notes:
+- Recommended Python: 3.11 for backend local dev/tests.
+- Backend API docs: http://localhost:8000/docs
 
 Security & policy notes:
 
