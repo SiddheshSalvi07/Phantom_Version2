@@ -1,0 +1,13 @@
+# Ignore env files and python/node artifacts
+.env
+.env.*
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+frontend/.next/
+dist/
+venv/
+.venv/
+*.sqlite3
+/.vscode/
