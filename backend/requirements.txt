@@ -1,6 +1,6 @@
-fastapi==0.110.0
+fastapi==0.95.2
 uvicorn[standard]==0.22.0
-pydantic==2.7.4
+pydantic==1.10.11
 redis==5.0.8
 SQLAlchemy==1.4.52
 requests==2.31.0
